@@ -21,20 +21,21 @@ package cli
 import (
 	"context"
 	"fmt"
-
+	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-go-sdk/client"
 	"google.golang.org/grpc"
 )
 
-func ExecuteScript(host string, script []byte) {
+func ExecuteScript(host string, script []byte, args []cadence.Value) {
 	ctx := context.Background()
 
 	flowClient, err := client.New(host, grpc.WithInsecure())
 	if err != nil {
 		Exitf(1, "Failed to connect to host: %s", err)
 	}
-	value, err := flowClient.ExecuteScriptAtLatestBlock(ctx, script, nil)
+
+	value, err := flowClient.ExecuteScriptAtLatestBlock(ctx, script, args)
 	if err != nil {
 		Exitf(1, "Failed to submit executable script: %s", err)
 	}
