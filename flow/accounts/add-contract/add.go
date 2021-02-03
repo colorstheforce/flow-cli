@@ -65,6 +65,7 @@ var Cmd = &cobra.Command{
 		cli.SendTransaction(
 			projectConf.HostWithOverride(conf.Host),
 			signerAccount,
+			[]*cli.Account{signerAccount},
 			tx,
 			conf.Results,
 		)
