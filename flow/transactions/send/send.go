@@ -19,6 +19,8 @@
 package send
 
 import (
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -33,6 +35,7 @@ import (
 type Config struct {
 	Signer  string `default:"service" flag:"signer,s"`
 	Code    string `flag:"code,c" info:"path to Cadence file"`
+	Args    string `flag:"args" info:"arguments to pass to transaction"`
 	Host    string `flag:"host" info:"Flow Access API host address"`
 	Results bool   `default:"false" flag:"results" info:"Display the results of the transaction"`
 }
@@ -40,18 +43,18 @@ type Config struct {
 var conf Config
 
 var Cmd = &cobra.Command{
-	Use:   "send",
-	Short: "Send a transaction",
+	Use:     "send",
+	Short:   "Send a transaction",
+	Example: `flow transactions send --code=./tx.cdc --args="[{\"type\": \"String\", \"value\": \"Hello, Cadence\"}]"`,
 	Run: func(cmd *cobra.Command, args []string) {
 		projectConf := cli.LoadConfig()
 
-		signerAccount := projectConf.Accounts[conf.Signer]
-		validateKeyPreReq(signerAccount)
 		var (
 			code []byte
 			err  error
 		)
 
+		// Code
 		if conf.Code != "" {
 			code, err = ioutil.ReadFile(conf.Code)
 			if err != nil {
@@ -59,11 +62,47 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		tx := flow.NewTransaction().
-			SetScript(code).
-			AddAuthorizer(signerAccount.Address)
+		tx := flow.NewTransaction().SetScript(code)
 
-		cli.SendTransaction(projectConf.HostWithOverride(conf.Host), signerAccount, tx, conf.Results)
+		// Arguments
+		transactionArguments, err := cli.ParseArguments(conf.Args)
+		if err != nil {
+			cli.Exitf(1, "Invalid arguments passed: %s", conf.Args)
+		}
+
+		for _, arg := range transactionArguments {
+			err := tx.AddArgument(arg)
+
+			if err != nil {
+				cli.Exitf(1, "Failed to add %s argument to a transaction ", conf.Code)
+			}
+		}
+
+		// Signers
+		var (
+			addresses []string
+			accounts  []*cli.Account
+		)
+		json.Unmarshal([]byte(conf.Signer), &addresses)
+
+		fmt.Println(conf.Signer)
+		fmt.Printf("%v", addresses)
+
+		for i, address := range addresses {
+			fmt.Printf("Address %s: %s", i, address)
+			// TODO: add check if account does't exist
+			signerAccount := projectConf.Accounts[address]
+			validateKeyPreReq(signerAccount)
+			accounts = append(accounts, signerAccount)
+
+			tx.AddAuthorizer(signerAccount.Address)
+		}
+
+		// Service account
+		serviceAccount := projectConf.Accounts["service"]
+		validateKeyPreReq(serviceAccount)
+
+		cli.SendTransaction(projectConf.HostWithOverride(conf.Host), serviceAccount, accounts, tx, conf.Results)
 	},
 }
 
