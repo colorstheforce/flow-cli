@@ -97,10 +97,10 @@ var Cmd = &cobra.Command{
 		tx := templates.CreateAccount(accountKeys, contracts, signerAccount.Address)
 
 		cli.SendTransaction(
-			projectConf.HostWithOverride(conf.Host),
-			signerAccount,
-			[]*cli.Account{signerAccount},
+			projectConf,
 			tx,
+			conf.Host,
+			conf.Signer,
 			conf.Results,
 		)
 	},
