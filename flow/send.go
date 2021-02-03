@@ -27,7 +27,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func SendTransaction(host string, signerAccount *Account, tx *flow.Transaction, withResults bool) {
+func SendTransaction(host string, serviceAccount *Account, signers []*Account, tx *flow.Transaction, withResults bool) {
 	ctx := context.Background()
 
 	flowClient, err := client.New(host, grpc.WithInsecure())
@@ -35,7 +35,12 @@ func SendTransaction(host string, signerAccount *Account, tx *flow.Transaction, 
 		Exitf(1, "Failed to connect to host: %s", err)
 	}
 
-	signerAddress := signerAccount.Address
+	signerAccount := serviceAccount
+	if len(signers) > 0 {
+		signerAccount = signers[0]
+	}
+
+	signerAddress := serviceAccount.Address
 
 	fmt.Printf("Getting information for account with address 0x%s ...\n", signerAddress.Hex())
 
