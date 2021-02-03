@@ -19,17 +19,12 @@
 package send
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"log"
-	"os"
-
+	cli "github.com/onflow/flow-cli/flow"
 	"github.com/onflow/flow-go-sdk"
 	"github.com/psiemens/sconfig"
 	"github.com/spf13/cobra"
-
-	cli "github.com/onflow/flow-cli/flow"
+	"io/ioutil"
+	"log"
 )
 
 type Config struct {
@@ -45,7 +40,7 @@ var conf Config
 var Cmd = &cobra.Command{
 	Use:     "send",
 	Short:   "Send a transaction",
-	Example: `flow transactions send --code=./tx.cdc --args="[{\"type\": \"String\", \"value\": \"Hello, Cadence\"}]"`,
+	Example: `flow transactions send --code=./tx.cdc --signer="service | 01cf0e2f2f715450" --args="[{\"type\": \"String\", \"value\": \"Hello, Cadence\"}]"`,
 	Run: func(cmd *cobra.Command, args []string) {
 		projectConf := cli.LoadConfig()
 
@@ -54,6 +49,8 @@ var Cmd = &cobra.Command{
 			err  error
 		)
 
+		tx := flow.NewTransaction()
+
 		// Code
 		if conf.Code != "" {
 			code, err = ioutil.ReadFile(conf.Code)
@@ -61,48 +58,30 @@ var Cmd = &cobra.Command{
 				cli.Exitf(1, "Failed to read transaction script from %s", conf.Code)
 			}
 		}
-
-		tx := flow.NewTransaction().SetScript(code)
+		tx.SetScript(code)
 
 		// Arguments
-		transactionArguments, err := cli.ParseArguments(conf.Args)
-		if err != nil {
-			cli.Exitf(1, "Invalid arguments passed: %s", conf.Args)
-		}
-
-		for _, arg := range transactionArguments {
-			err := tx.AddArgument(arg)
-
+		if conf.Args != "" {
+			transactionArguments, err := cli.ParseArguments(conf.Args)
 			if err != nil {
-				cli.Exitf(1, "Failed to add %s argument to a transaction ", conf.Code)
+				cli.Exitf(1, "Invalid arguments passed: %s", conf.Args)
+			}
+			for _, arg := range transactionArguments {
+				err := tx.AddArgument(arg)
+
+				if err != nil {
+					cli.Exitf(1, "Failed to add %s argument to a transaction ", conf.Code)
+				}
 			}
 		}
 
-		// Signers
-		var (
-			addresses []string
-			accounts  []*cli.Account
+		cli.SendTransaction(
+			projectConf,
+			tx,
+			conf.Host,
+			conf.Signer,
+			conf.Results,
 		)
-		json.Unmarshal([]byte(conf.Signer), &addresses)
-
-		fmt.Println(conf.Signer)
-		fmt.Printf("%v", addresses)
-
-		for i, address := range addresses {
-			fmt.Printf("Address %s: %s", i, address)
-			// TODO: add check if account does't exist
-			signerAccount := projectConf.Accounts[address]
-			validateKeyPreReq(signerAccount)
-			accounts = append(accounts, signerAccount)
-
-			tx.AddAuthorizer(signerAccount.Address)
-		}
-
-		// Service account
-		serviceAccount := projectConf.Accounts["service"]
-		validateKeyPreReq(serviceAccount)
-
-		cli.SendTransaction(projectConf.HostWithOverride(conf.Host), serviceAccount, accounts, tx, conf.Results)
 	},
 }
 
@@ -118,23 +97,4 @@ func initConfig() {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-func validateKeyPreReq(account *cli.Account) {
-	if account.KeyType == cli.KeyTypeHex {
-		// Always Valid
-		return
-	} else if account.KeyType == cli.KeyTypeKMS {
-		// Check GOOGLE_APPLICATION_CREDENTIALS
-		googleAppCreds := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
-		if len(googleAppCreds) == 0 {
-			if len(account.KeyContext["projectId"]) == 0 {
-				cli.Exitf(1, "Could not get GOOGLE_APPLICATION_CREDENTIALS, no google service account json provided but private key type is KMS", account.Address)
-			}
-			cli.GcloudApplicationSignin(account.KeyContext["projectId"])
-		}
-		return
-	}
-	cli.Exitf(1, "Failed to validate %s key for %s", account.KeyType, account.Address)
-
 }
