@@ -13,10 +13,10 @@ require (
 	github.com/onflow/flow-emulator v0.16.1
 	github.com/onflow/flow-go-sdk v0.15.0
 	github.com/psiemens/sconfig v0.0.0-20190623041652-6e01eb1354fc
-	github.com/spf13/afero v1.1.2
+	github.com/spf13/afero v1.9.2
 	github.com/spf13/cobra v0.0.7
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.1
 	github.com/thoas/go-funk v0.7.0
 	gonum.org/v1/gonum v0.6.1
-	google.golang.org/grpc v1.32.0
+	google.golang.org/grpc v1.53.0
 )
